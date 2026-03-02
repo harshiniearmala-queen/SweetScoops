@@ -1,0 +1,287 @@
+<!DOCTYPE html>
+<html>
+<head>
+    <title>SweetScoops</title>
+
+<style>
+body {
+    font-family: 'Segoe UI', sans-serif;
+    margin: 0;
+    background: linear-gradient(to right, #fff0f5, #ffe5ec);
+}
+
+/* NAVBAR */
+.navbar {
+    background-color: #ff4d6d;
+    color: white;
+    padding: 15px 30px;
+    display: flex;
+    justify-content: space-between;
+    align-items: center;
+}
+
+.navbar button {
+    background: white;
+    color: #ff4d6d;
+    margin-left: 10px;
+    font-weight: bold;
+}
+
+.container {
+    padding: 30px;
+}
+
+/* LOGIN CARD */
+.card {
+    background: white;
+    padding: 25px;
+    border-radius: 15px;
+    box-shadow: 0 6px 20px rgba(0,0,0,0.1);
+    max-width: 500px;
+    margin: 40px auto;
+}
+
+/* INPUTS */
+input {
+    padding: 10px;
+    margin: 8px 0;
+    width: 100%;
+    border-radius: 8px;
+    border: 1px solid #ddd;
+}
+
+button {
+    padding: 8px 14px;
+    border: none;
+    border-radius: 8px;
+    background-color: #ff4d6d;
+    color: white;
+    cursor: pointer;
+}
+
+button:hover {
+    opacity: 0.85;
+}
+
+/* HERO */
+.hero {
+    text-align: center;
+    margin-bottom: 30px;
+}
+
+.hero h1 {
+    font-size: 32px;
+    color: #ff4d6d;
+}
+
+/* PRODUCT GRID */
+.products-container {
+    display: grid;
+    grid-template-columns: repeat(auto-fit, minmax(220px, 1fr));
+    gap: 20px;
+}
+
+.product-card {
+    background: white;
+    padding: 15px;
+    border-radius: 15px;
+    box-shadow: 0 4px 12px rgba(0,0,0,0.08);
+}
+
+.product-card h3 {
+    margin: 0;
+}
+
+.product-card button {
+    margin-top: 10px;
+}
+
+/* CART */
+.cart {
+    margin-top: 30px;
+    padding: 20px;
+    background: #fff3cd;
+    border-radius: 15px;
+}
+</style>
+</head>
+
+<body>
+
+<!-- NAVBAR -->
+<div class="navbar" id="navbar" style="display:none;">
+    <h2>🍦 SweetScoops</h2>
+    <div>
+        <button onclick="loadProducts()">Refresh Products</button>
+        <button onclick="logout()">Logout</button>
+    </div>
+</div>
+
+<div class="container">
+
+<!-- LOGIN SECTION -->
+<div id="loginSection" class="card">
+    <h2>Login</h2>
+    <input type="text" id="username" placeholder="Username">
+    <input type="password" id="password" placeholder="Password">
+    <button onclick="login()">Login</button>
+    <p id="loginMessage"></p>
+</div>
+
+<!-- APP SECTION -->
+<div id="appSection" style="display:none;">
+
+    <div class="hero">
+        <h1>Fresh & Delicious Ice Cream 🍨</h1>
+        <p>Order your favorite flavors now!</p>
+    </div>
+
+    <!-- ADD PRODUCT -->
+    <div class="card">
+        <h3>Add Product</h3>
+        <input type="text" id="newProductName" placeholder="Product Name">
+        <input type="text" id="newProductFlavor" placeholder="Flavor">
+        <input type="number" id="newProductPrice" placeholder="Price">
+        <input type="number" id="newProductStock" placeholder="Stock">
+        <button onclick="addProduct()">Add Product</button>
+    </div>
+
+    <h2>Products</h2>
+    <div class="products-container" id="productList"></div>
+
+    <div class="cart">
+        <h2>🛒 Cart</h2>
+        <ul id="cartList"></ul>
+        <h3>Total: ₹<span id="totalPrice">0</span></h3>
+    </div>
+
+</div>
+
+</div>
+
+<script>
+
+const API_URL = "http://127.0.0.1:8000";
+
+let cart = [];
+let token = null;
+
+/* LOGIN */
+async function login() {
+    const username = document.getElementById("username").value;
+    const password = document.getElementById("password").value;
+
+    const response = await fetch(`${API_URL}/login`, {
+        method: "POST",
+        headers: { "Content-Type": "application/json" },
+        body: JSON.stringify({ username, password })
+    });
+
+    const data = await response.json();
+
+    if (response.ok && data.access_token) {
+        token = data.access_token;
+
+        document.getElementById("loginSection").style.display = "none";
+        document.getElementById("appSection").style.display = "block";
+        document.getElementById("navbar").style.display = "flex";
+
+        loadProducts();   // ✅ AUTO LOAD PRODUCTS AFTER LOGIN
+    } else {
+        document.getElementById("loginMessage").textContent = "Login failed!";
+    }
+}
+
+/* LOGOUT */
+function logout() {
+    token = null;
+    cart = [];
+
+    document.getElementById("appSection").style.display = "none";
+    document.getElementById("navbar").style.display = "none";
+    document.getElementById("loginSection").style.display = "block";
+}
+
+/* ADD PRODUCT */
+async function addProduct() {
+    const name = document.getElementById("newProductName").value;
+    const flavor = document.getElementById("newProductFlavor").value;
+    const price = parseFloat(document.getElementById("newProductPrice").value);
+    const stock = parseInt(document.getElementById("newProductStock").value);
+
+    const response = await fetch(`${API_URL}/products`, {
+        method: "POST",
+        headers: {
+            "Content-Type": "application/json",
+            "Authorization": `Bearer ${token}`   // ✅ TOKEN ADDED
+        },
+        body: JSON.stringify({ name, flavor, price, stock })
+    });
+
+    if (response.ok) {
+        loadProducts();
+    } else {
+        alert("Error adding product (check backend auth)");
+    }
+}
+
+/* LOAD PRODUCTS */
+async function loadProducts() {
+    const response = await fetch(`${API_URL}/products`);
+    const data = await response.json();
+
+    const container = document.getElementById("productList");
+    container.innerHTML = "";
+
+    data.forEach(product => {
+        const card = document.createElement("div");
+        card.className = "product-card";
+        card.innerHTML = `
+            <h3>${product.name}</h3>
+            <p>Flavor: ${product.flavor}</p>
+            <p>Price: ₹${product.price}</p>
+            <p>Stock: ${product.stock}</p>
+            <button onclick="addToCart('${product.name}', ${product.price})">Add to Cart</button>
+            <button onclick="deleteProduct(${product.id})" style="background:red;">Delete</button>
+        `;
+        container.appendChild(card);
+    });
+}
+
+/* DELETE PRODUCT */
+async function deleteProduct(id) {
+    await fetch(`${API_URL}/products/${id}`, {
+        method: "DELETE",
+        headers: {
+            "Authorization": `Bearer ${token}`   // ✅ TOKEN ADDED
+        }
+    });
+
+    loadProducts();
+}
+
+/* CART */
+function addToCart(name, price) {
+    cart.push({ name, price });
+    displayCart();
+}
+
+function displayCart() {
+    const cartList = document.getElementById("cartList");
+    cartList.innerHTML = "";
+    let total = 0;
+
+    cart.forEach(item => {
+        const li = document.createElement("li");
+        li.textContent = `${item.name} - ₹${item.price}`;
+        cartList.appendChild(li);
+        total += item.price;
+    });
+
+    document.getElementById("totalPrice").textContent = total;
+}
+
+</script>
+
+</body>
+</html>
